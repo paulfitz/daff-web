@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>daff - data diffs</title>
+        <script src="daff.js"></script>
+    </head>
+
+    <body>
+
+        <h2>table 1</h2>
+
+        <div id="table1"><pre></pre></div>
+
+        <h2>table 2</h2>
+
+        <div id="table2"><pre></pre></div>
+
+        <h2>diff</h2>
+
+        <div id="diff"><pre></pre></div>
+
+        <script>
+         
+         var data1 = [
+             ['Country','Capital'],
+             ['Ireland','Dublin'],
+             ['France','Paris'],
+             ['Spain','Barcelona']
+         ];
+         var data2 = [
+             ['Country','Code','Capital'],
+             ['Ireland','ie','Dublin'],
+             ['France','fr','Paris'],
+             ['Spain','es','Madrid'],
+             ['Germany','de','Berlin']
+         ];
+
+         var table1 = new daff.TableView(data1);
+         var table2 = new daff.TableView(data2);
+
+         var diff = daff.diff(table1,table2);
+         console.log(diff);
+
+         document.querySelectorAll('#table1 pre')[0].innerHTML = table1.toString();
+         document.querySelectorAll('#table2 pre')[0].innerHTML = table2.toString();
+         document.querySelectorAll('#diff pre')[0].innerHTML = diff.toString();
+
+        </script>
+
+    </body>
+</html>
