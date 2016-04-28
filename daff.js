@@ -2,14 +2,6 @@
 $hx_exports.coopy = $hx_exports.coopy || {};
 var HxOverrides = function() { };
 HxOverrides.__name__ = true;
-HxOverrides.dateStr = function(date) {
-	var m = date.getMonth() + 1;
-	var d = date.getDate();
-	var h = date.getHours();
-	var mi = date.getMinutes();
-	var s = date.getSeconds();
-	return date.getFullYear() + "-" + (m < 10?"0" + m:"" + m) + "-" + (d < 10?"0" + d:"" + d) + " " + (h < 10?"0" + h:"" + h) + ":" + (mi < 10?"0" + mi:"" + mi) + ":" + (s < 10?"0" + s:"" + s);
-};
 HxOverrides.cca = function(s,index) {
 	var x = s.charCodeAt(index);
 	if(x != x) return undefined;
@@ -50,14 +42,6 @@ Lambda.map = function(it,f) {
 		l.add(f(x));
 	}
 	return l;
-};
-Lambda.has = function(it,elt) {
-	var $it0 = $iterator(it)();
-	while( $it0.hasNext() ) {
-		var x = $it0.next();
-		if(x == elt) return true;
-	}
-	return false;
 };
 var List = function() {
 	this.length = 0;
@@ -102,9 +86,6 @@ Reflect.field = function(o,field) {
 		return null;
 	}
 };
-Reflect.setField = function(o,field,value) {
-	o[field] = value;
-};
 Reflect.fields = function(o) {
 	var a = [];
 	if(o != null) {
@@ -115,9 +96,6 @@ Reflect.fields = function(o) {
 	}
 	return a;
 };
-Reflect.isFunction = function(f) {
-	return typeof(f) == "function" && !(f.__name__ || f.__ename__);
-};
 Reflect.compare = function(a,b) {
 	if(a == b) return 0; else if(a > b) return 1; else return -1;
 };
@@ -125,22 +103,6 @@ var Std = function() { };
 Std.__name__ = true;
 Std.string = function(s) {
 	return js.Boot.__string_rec(s,"");
-};
-Std.parseInt = function(x) {
-	var v = parseInt(x,10);
-	if(v == 0 && (HxOverrides.cca(x,1) == 120 || HxOverrides.cca(x,1) == 88)) v = parseInt(x);
-	if(isNaN(v)) return null;
-	return v;
-};
-Std.parseFloat = function(x) {
-	return parseFloat(x);
-};
-var StringBuf = function() {
-	this.b = "";
-};
-StringBuf.__name__ = true;
-StringBuf.prototype = {
-	__class__: StringBuf
 };
 var StringTools = function() { };
 StringTools.__name__ = true;
@@ -163,64 +125,8 @@ StringTools.rtrim = function(s) {
 StringTools.trim = function(s) {
 	return StringTools.ltrim(StringTools.rtrim(s));
 };
-StringTools.lpad = function(s,c,l) {
-	if(c.length <= 0) return s;
-	while(s.length < l) s = c + s;
-	return s;
-};
 StringTools.replace = function(s,sub,by) {
 	return s.split(sub).join(by);
-};
-StringTools.fastCodeAt = function(s,index) {
-	return s.charCodeAt(index);
-};
-var ValueType = { __ename__ : true, __constructs__ : ["TNull","TInt","TFloat","TBool","TObject","TFunction","TClass","TEnum","TUnknown"] };
-ValueType.TNull = ["TNull",0];
-ValueType.TNull.__enum__ = ValueType;
-ValueType.TInt = ["TInt",1];
-ValueType.TInt.__enum__ = ValueType;
-ValueType.TFloat = ["TFloat",2];
-ValueType.TFloat.__enum__ = ValueType;
-ValueType.TBool = ["TBool",3];
-ValueType.TBool.__enum__ = ValueType;
-ValueType.TObject = ["TObject",4];
-ValueType.TObject.__enum__ = ValueType;
-ValueType.TFunction = ["TFunction",5];
-ValueType.TFunction.__enum__ = ValueType;
-ValueType.TClass = function(c) { var $x = ["TClass",6,c]; $x.__enum__ = ValueType; return $x; };
-ValueType.TEnum = function(e) { var $x = ["TEnum",7,e]; $x.__enum__ = ValueType; return $x; };
-ValueType.TUnknown = ["TUnknown",8];
-ValueType.TUnknown.__enum__ = ValueType;
-var Type = function() { };
-Type.__name__ = true;
-Type["typeof"] = function(v) {
-	var _g = typeof(v);
-	switch(_g) {
-	case "boolean":
-		return ValueType.TBool;
-	case "string":
-		return ValueType.TClass(String);
-	case "number":
-		if(Math.ceil(v) == v % 2147483648.0) return ValueType.TInt;
-		return ValueType.TFloat;
-	case "object":
-		if(v == null) return ValueType.TNull;
-		var e = v.__enum__;
-		if(e != null) return ValueType.TEnum(e);
-		var c = js.Boot.getClass(v);
-		if(c != null) return ValueType.TClass(c);
-		return ValueType.TObject;
-	case "function":
-		if(v.__name__ || v.__ename__) return ValueType.TObject;
-		return ValueType.TFunction;
-	case "undefined":
-		return ValueType.TNull;
-	default:
-		return ValueType.TUnknown;
-	}
-};
-Type.enumIndex = function(e) {
-	return e[1];
 };
 var coopy = {};
 coopy.Alignment = function() {
@@ -759,6 +665,7 @@ coopy.CompareFlags = $hx_exports.coopy.CompareFlags = function() {
 	this.count_like_a_spreadsheet = true;
 	this.ignore_whitespace = false;
 	this.ignore_case = false;
+	this.terminal_format = null;
 };
 coopy.CompareFlags.__name__ = true;
 coopy.CompareFlags.prototype = {
@@ -1401,9 +1308,12 @@ coopy.Coopy.diffAsHtml = function(local,remote,flags) {
 	return render.renderTables(os).html();
 };
 coopy.Coopy.diffAsAnsi = function(local,remote,flags) {
-	var o = coopy.Coopy.diff(local,remote,flags);
-	var render = new coopy.TerminalDiffRender(flags);
-	return render.render(o);
+	var tool = new coopy.Coopy(new coopy.TableIO());
+	tool.cache_txt = "";
+	if(flags == null) flags = new coopy.CompareFlags();
+	tool.output_format = "csv";
+	tool.runDiff(flags.parent,local,remote,flags,null);
+	return tool.cache_txt;
 };
 coopy.Coopy.diff = function(local,remote,flags) {
 	var comp = new coopy.TableComparisonState();
@@ -1463,14 +1373,9 @@ coopy.Coopy.keepAround = function() {
 	var hp = new coopy.HighlightPatch(null,null);
 	var csv = new coopy.Csv();
 	var tm = new coopy.TableModifier(null);
-	var sc = new coopy.SqlCompare(null,null,null,null);
-	var sq = new coopy.SqliteHelper();
 	var sm = new coopy.SimpleMeta(null);
 	var ct = new coopy.CombinedTable(null);
 	return 0;
-};
-coopy.Coopy.cellFor = function(x) {
-	return x;
 };
 coopy.Coopy.main = function() {
 	return 0;
@@ -1529,50 +1434,54 @@ coopy.Coopy.prototype = {
 		this.nested_output = false;
 		this.order_set = false;
 		this.order_preference = false;
+		this.strategy = null;
 		this.pretty = true;
 		this.css_output = null;
 		this.fragment = false;
 		this.flags = null;
+		this.cache_txt = null;
 	}
 	,checkFormat: function(name) {
 		if(this.extern_preference) return this.format_preference;
 		var ext = "";
-		var pt = name.lastIndexOf(".");
-		if(pt >= 0) {
-			ext = HxOverrides.substr(name,pt + 1,null).toLowerCase();
-			switch(ext) {
-			case "json":
-				this.format_preference = "json";
-				break;
-			case "ndjson":
-				this.format_preference = "ndjson";
-				break;
-			case "csv":
-				this.format_preference = "csv";
-				this.delim_preference = ",";
-				break;
-			case "tsv":
-				this.format_preference = "csv";
-				this.delim_preference = "\t";
-				break;
-			case "ssv":
-				this.format_preference = "csv";
-				this.delim_preference = ";";
-				break;
-			case "sqlite3":
-				this.format_preference = "sqlite";
-				break;
-			case "sqlite":
-				this.format_preference = "sqlite";
-				break;
-			case "html":case "htm":
-				this.format_preference = "html";
-				break;
-			case "www":
-				this.format_preference = "www";
-				break;
-			default:
-				ext = "";
+		if(name != null) {
+			var pt = name.lastIndexOf(".");
+			if(pt >= 0) {
+				ext = HxOverrides.substr(name,pt + 1,null).toLowerCase();
+				switch(ext) {
+				case "json":
+					this.format_preference = "json";
+					break;
+				case "ndjson":
+					this.format_preference = "ndjson";
+					break;
+				case "csv":
+					this.format_preference = "csv";
+					this.delim_preference = ",";
+					break;
+				case "tsv":
+					this.format_preference = "csv";
+					this.delim_preference = "\t";
+					break;
+				case "ssv":
+					this.format_preference = "csv";
+					this.delim_preference = ";";
+					break;
+				case "sqlite3":
+					this.format_preference = "sqlite";
+					break;
+				case "sqlite":
+					this.format_preference = "sqlite";
+					break;
+				case "html":case "htm":
+					this.format_preference = "html";
+					break;
+				case "www":
+					this.format_preference = "www";
+					break;
+				default:
+					ext = "";
+				}
 			}
 		}
 		this.nested_output = this.format_preference == "json" || this.format_preference == "ndjson";
@@ -1621,7 +1530,7 @@ coopy.Coopy.prototype = {
 			} else if(this.format_preference == "ndjson") txt = new coopy.Ndjson(t).render(); else if(this.format_preference == "html" || this.format_preference == "www") this.renderTable(name,t); else if(this.format_preference == "sqlite") {
 				this.io.writeStderr("! Cannot yet output to sqlite, aborting\n");
 				return "";
-			} else txt = haxe.Json.stringify(coopy.Coopy.jsonify(t),null,"  ");
+			} else txt = JSON.stringify(coopy.Coopy.jsonify(t),null,"  ");
 		} else txt = render.render(t);
 		return txt;
 	}
@@ -1664,562 +1573,25 @@ coopy.Coopy.prototype = {
 		return this.saveText(name,txt);
 	}
 	,saveText: function(name,txt) {
-		if(name != "-") this.io.saveContent(name,txt); else this.io.writeStdout(txt);
+		if(name == null) this.cache_txt += txt; else if(name != "-") this.io.saveContent(name,txt); else this.io.writeStdout(txt);
 		return true;
 	}
-	,jsonToTables: function(json) {
-		var tables = Reflect.field(json,"tables");
-		if(tables == null) return this.jsonToTable(json);
-		return new coopy.JsonTables(json,this.flags);
-	}
-	,jsonToTable: function(json) {
-		var output = null;
-		var _g = 0;
-		var _g1 = Reflect.fields(json);
-		while(_g < _g1.length) {
-			var name = _g1[_g];
-			++_g;
-			var t = Reflect.field(json,name);
-			var columns = Reflect.field(t,"columns");
-			if(columns == null) continue;
-			var rows = Reflect.field(t,"rows");
-			if(rows == null) continue;
-			output = new coopy.SimpleTable(columns.length,rows.length);
-			var has_hash = false;
-			var has_hash_known = false;
-			var _g3 = 0;
-			var _g2 = rows.length;
-			while(_g3 < _g2) {
-				var i = _g3++;
-				var row = rows[i];
-				if(!has_hash_known) {
-					if(Reflect.fields(row).length == columns.length) has_hash = true;
-					has_hash_known = true;
-				}
-				if(!has_hash) {
-					var lst = row;
-					var _g5 = 0;
-					var _g4 = columns.length;
-					while(_g5 < _g4) {
-						var j = _g5++;
-						var val = lst[j];
-						output.setCell(j,i,coopy.Coopy.cellFor(val));
-					}
-				} else {
-					var _g51 = 0;
-					var _g41 = columns.length;
-					while(_g51 < _g41) {
-						var j1 = _g51++;
-						var val1 = Reflect.field(row,columns[j1]);
-						output.setCell(j1,i,coopy.Coopy.cellFor(val1));
-					}
+	,runDiff: function(parent,a,b,flags,output) {
+		var ct = coopy.Coopy.compareTables3(parent,a,b,flags);
+		var align = ct.align();
+		var td = new coopy.TableDiff(align,flags);
+		var o = new coopy.SimpleTable(0,0);
+		var os = new coopy.Tables(o);
+		td.hiliteWithNesting(os);
+		var use_color = flags.terminal_format == "ansi";
+		if(flags.terminal_format == null) {
+			if((output == null || output == "-") && (this.output_format == "copy" || this.output_format == "csv")) {
+				if(this.io != null) {
+					if(this.io.isTtyKnown()) use_color = this.io.isTty();
 				}
 			}
 		}
-		if(output != null) output.trimBlank();
-		return output;
-	}
-	,loadTable: function(name) {
-		var ext = this.checkFormat(name);
-		if(ext == "sqlite") {
-			var sql = this.io.openSqliteDatabase(name);
-			if(sql == null) {
-				this.io.writeStderr("! Cannot open database, aborting\n");
-				return null;
-			}
-			var tab = new coopy.SqlTables(sql,this.flags);
-			return tab;
-		}
-		var txt = this.io.getContent(name);
-		if(ext == "ndjson") {
-			var t = new coopy.SimpleTable(0,0);
-			var ndjson = new coopy.Ndjson(t);
-			ndjson.parse(txt);
-			return t;
-		}
-		if(ext == "json" || ext == "") try {
-			var json = new haxe.format.JsonParser(txt).parseRec();
-			this.format_preference = "json";
-			var t1 = this.jsonToTables(json);
-			if(t1 == null) throw "JSON failed";
-			return t1;
-		} catch( e ) {
-			if(ext == "json") throw e;
-		}
-		this.format_preference = "csv";
-		var csv = new coopy.Csv(this.delim_preference);
-		var output = new coopy.SimpleTable(0,0);
-		csv.parseTable(txt,output);
-		if(output != null) output.trimBlank();
-		return output;
-	}
-	,command: function(io,cmd,args) {
-		var r = 0;
-		if(io.async()) r = io.command(cmd,args);
-		if(r != 999) {
-			io.writeStdout("$ " + cmd);
-			var _g = 0;
-			while(_g < args.length) {
-				var arg = args[_g];
-				++_g;
-				io.writeStdout(" ");
-				var spaced = arg.indexOf(" ") >= 0;
-				if(spaced) io.writeStdout("\"");
-				io.writeStdout(arg);
-				if(spaced) io.writeStdout("\"");
-			}
-			io.writeStdout("\n");
-		}
-		if(!io.async()) r = io.command(cmd,args);
-		return r;
-	}
-	,installGitDriver: function(io,formats) {
-		var r = 0;
-		if(this.status == null) {
-			this.status = new haxe.ds.StringMap();
-			this.daff_cmd = "";
-		}
-		var key = "hello";
-		if(!this.status.exists(key)) {
-			io.writeStdout("Setting up git to use daff on");
-			var _g = 0;
-			while(_g < formats.length) {
-				var format = formats[_g];
-				++_g;
-				io.writeStdout(" *." + format);
-			}
-			io.writeStdout(" files\n");
-			this.status.set(key,r);
-		}
-		key = "can_run_git";
-		if(!this.status.exists(key)) {
-			r = this.command(io,"git",["--version"]);
-			if(r == 999) return r;
-			this.status.set(key,r);
-			if(r != 0) {
-				io.writeStderr("! Cannot run git, aborting\n");
-				return 1;
-			}
-			io.writeStdout("- Can run git\n");
-		}
-		var daffs = ["daff","daff.rb","daff.py"];
-		if(this.daff_cmd == "") {
-			var _g1 = 0;
-			while(_g1 < daffs.length) {
-				var daff = daffs[_g1];
-				++_g1;
-				var key1 = "can_run_" + daff;
-				if(!this.status.exists(key1)) {
-					r = this.command(io,daff,["version"]);
-					if(r == 999) return r;
-					this.status.set(key1,r);
-					if(r == 0) {
-						this.daff_cmd = daff;
-						io.writeStdout("- Can run " + daff + " as \"" + daff + "\"\n");
-						break;
-					}
-				}
-			}
-			if(this.daff_cmd == "") {
-				io.writeStderr("! Cannot find daff, is it in your path?\n");
-				return 1;
-			}
-		}
-		var _g2 = 0;
-		while(_g2 < formats.length) {
-			var format1 = formats[_g2];
-			++_g2;
-			key = "have_diff_driver_" + format1;
-			if(!this.status.exists(key)) {
-				r = this.command(io,"git",["config","--global","--get","diff.daff-" + format1 + ".command"]);
-				if(r == 999) return r;
-				this.status.set(key,r);
-			}
-			var have_diff_driver = this.status.get(key) == 0;
-			key = "add_diff_driver_" + format1;
-			if(!this.status.exists(key)) {
-				r = this.command(io,"git",["config","--global","diff.daff-" + format1 + ".command",this.daff_cmd + " diff --git"]);
-				if(r == 999) return r;
-				if(have_diff_driver) io.writeStdout("- Cleared existing daff diff driver for " + format1 + "\n");
-				io.writeStdout("- Added diff driver for " + format1 + "\n");
-				this.status.set(key,r);
-			}
-			key = "have_merge_driver_" + format1;
-			if(!this.status.exists(key)) {
-				r = this.command(io,"git",["config","--global","--get","merge.daff-" + format1 + ".driver"]);
-				if(r == 999) return r;
-				this.status.set(key,r);
-			}
-			var have_merge_driver = this.status.get(key) == 0;
-			key = "name_merge_driver_" + format1;
-			if(!this.status.exists(key)) {
-				if(!have_merge_driver) {
-					r = this.command(io,"git",["config","--global","merge.daff-" + format1 + ".name","daff tabular " + format1 + " merge"]);
-					if(r == 999) return r;
-				} else r = 0;
-				this.status.set(key,r);
-			}
-			key = "add_merge_driver_" + format1;
-			if(!this.status.exists(key)) {
-				r = this.command(io,"git",["config","--global","merge.daff-" + format1 + ".driver",this.daff_cmd + " merge --output %A %O %A %B"]);
-				if(r == 999) return r;
-				if(have_merge_driver) io.writeStdout("- Cleared existing daff merge driver for " + format1 + "\n");
-				io.writeStdout("- Added merge driver for " + format1 + "\n");
-				this.status.set(key,r);
-			}
-		}
-		if(!io.exists(".git/config")) {
-			io.writeStderr("! This next part needs to happen in a git repository.\n");
-			io.writeStderr("! Please run again from the root of a git repository.\n");
-			return 1;
-		}
-		var attr = ".gitattributes";
-		var txt = "";
-		var post = "";
-		if(!io.exists(attr)) io.writeStdout("- No .gitattributes file\n"); else {
-			io.writeStdout("- You have a .gitattributes file\n");
-			txt = io.getContent(attr);
-		}
-		var need_update = false;
-		var _g3 = 0;
-		while(_g3 < formats.length) {
-			var format2 = formats[_g3];
-			++_g3;
-			if(txt.indexOf("*." + format2) >= 0) io.writeStderr("- Your .gitattributes file already mentions *." + format2 + "\n"); else {
-				post += "*." + format2 + " diff=daff-" + format2 + "\n";
-				post += "*." + format2 + " merge=daff-" + format2 + "\n";
-				io.writeStdout("- Placing the following lines in .gitattributes:\n");
-				io.writeStdout(post);
-				if(txt != "" && !need_update) txt += "\n";
-				txt += post;
-				need_update = true;
-			}
-		}
-		if(need_update) io.saveContent(attr,txt);
-		io.writeStdout("- Done!\n");
-		return 0;
-	}
-	,coopyhx: function(io) {
-		this.init();
-		var args = io.args();
-		if(args[0] == "--keep") return coopy.Coopy.keepAround();
-		var more = true;
-		var output = null;
-		var inplace = false;
-		var git = false;
-		var color = false;
-		var no_color = false;
-		this.flags = new coopy.CompareFlags();
-		this.flags.always_show_header = true;
-		while(more) {
-			more = false;
-			var _g1 = 0;
-			var _g = args.length;
-			while(_g1 < _g) {
-				var i = _g1++;
-				var tag = args[i];
-				if(tag == "--output") {
-					more = true;
-					output = args[i + 1];
-					args.splice(i,2);
-					break;
-				} else if(tag == "--css") {
-					more = true;
-					this.fragment = true;
-					this.css_output = args[i + 1];
-					args.splice(i,2);
-					break;
-				} else if(tag == "--fragment") {
-					more = true;
-					this.fragment = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--plain") {
-					more = true;
-					this.pretty = false;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--all") {
-					more = true;
-					this.flags.show_unchanged = true;
-					this.flags.show_unchanged_columns = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--all-rows") {
-					more = true;
-					this.flags.show_unchanged = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--all-columns") {
-					more = true;
-					this.flags.show_unchanged_columns = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--act") {
-					more = true;
-					if(this.flags.acts == null) this.flags.acts = new haxe.ds.StringMap();
-					{
-						this.flags.acts.set(args[i + 1],true);
-						true;
-					}
-					args.splice(i,2);
-					break;
-				} else if(tag == "--context") {
-					more = true;
-					var context = Std.parseInt(args[i + 1]);
-					if(context >= 0) this.flags.unchanged_context = context;
-					args.splice(i,2);
-					break;
-				} else if(tag == "--inplace") {
-					more = true;
-					inplace = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--git") {
-					more = true;
-					git = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--unordered") {
-					more = true;
-					this.flags.ordered = false;
-					this.flags.unchanged_context = 0;
-					this.order_set = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--ordered") {
-					more = true;
-					this.flags.ordered = true;
-					this.order_set = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--color") {
-					more = true;
-					color = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--no-color") {
-					more = true;
-					no_color = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--input-format") {
-					more = true;
-					this.setFormat(args[i + 1]);
-					args.splice(i,2);
-					break;
-				} else if(tag == "--output-format") {
-					more = true;
-					this.output_format = args[i + 1];
-					this.output_format_set = true;
-					args.splice(i,2);
-					break;
-				} else if(tag == "--id") {
-					more = true;
-					if(this.flags.ids == null) this.flags.ids = [];
-					this.flags.ids.push(args[i + 1]);
-					args.splice(i,2);
-					break;
-				} else if(tag == "--ignore") {
-					more = true;
-					this.flags.ignoreColumn(args[i + 1]);
-					args.splice(i,2);
-					break;
-				} else if(tag == "--index") {
-					more = true;
-					this.flags.always_show_order = true;
-					this.flags.never_show_order = false;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--www") {
-					more = true;
-					this.output_format = "www";
-					this.output_format_set = true;
-					args.splice(i,1);
-				} else if(tag == "--table") {
-					more = true;
-					this.flags.addTable(args[i + 1]);
-					args.splice(i,2);
-					break;
-				} else if(tag == "-w" || tag == "--ignore-whitespace") {
-					more = true;
-					this.flags.ignore_whitespace = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "-i" || tag == "--ignore-case") {
-					more = true;
-					this.flags.ignore_case = true;
-					args.splice(i,1);
-					break;
-				} else if(tag == "--padding") {
-					more = true;
-					this.flags.padding_strategy = args[i + 1];
-					args.splice(i,2);
-					break;
-				}
-			}
-		}
-		var cmd = args[0];
-		if(args.length < 2) {
-			if(cmd == "version") {
-				io.writeStdout(coopy.Coopy.VERSION + "\n");
-				return 0;
-			}
-			if(cmd == "git") {
-				io.writeStdout("You can use daff to improve git's handling of csv files, by using it as a\ndiff driver (for showing what has changed) and as a merge driver (for merging\nchanges between multiple versions).\n");
-				io.writeStdout("\n");
-				io.writeStdout("Automatic setup\n");
-				io.writeStdout("---------------\n\n");
-				io.writeStdout("Run:\n");
-				io.writeStdout("  daff git csv\n");
-				io.writeStdout("\n");
-				io.writeStdout("Manual setup\n");
-				io.writeStdout("------------\n\n");
-				io.writeStdout("Create and add a file called .gitattributes in the root directory of your\nrepository, containing:\n\n");
-				io.writeStdout("  *.csv diff=daff-csv\n");
-				io.writeStdout("  *.csv merge=daff-csv\n");
-				io.writeStdout("\nCreate a file called .gitconfig in your home directory (or alternatively\nopen .git/config for a particular repository) and add:\n\n");
-				io.writeStdout("  [diff \"daff-csv\"]\n");
-				io.writeStdout("  command = daff diff --git\n");
-				io.writeStderr("\n");
-				io.writeStdout("  [merge \"daff-csv\"]\n");
-				io.writeStdout("  name = daff tabular merge\n");
-				io.writeStdout("  driver = daff merge --output %A %O %A %B\n\n");
-				io.writeStderr("Make sure you can run daff from the command-line as just \"daff\" - if not,\nreplace \"daff\" in the driver and command lines above with the correct way\nto call it. Add --no-color if your terminal does not support ANSI colors.");
-				io.writeStderr("\n");
-				return 0;
-			}
-			io.writeStderr("daff can produce and apply tabular diffs.\n");
-			io.writeStderr("Call as:\n");
-			io.writeStderr("  daff [--color] [--no-color] [--output OUTPUT.csv] a.csv b.csv\n");
-			io.writeStderr("  daff [--output OUTPUT.html] a.csv b.csv\n");
-			io.writeStderr("  daff [--output OUTPUT.csv] parent.csv a.csv b.csv\n");
-			io.writeStderr("  daff [--output OUTPUT.ndjson] a.ndjson b.ndjson\n");
-			io.writeStderr("  daff [--www] a.csv b.csv\n");
-			io.writeStderr("  daff patch [--inplace] [--output OUTPUT.csv] a.csv patch.csv\n");
-			io.writeStderr("  daff merge [--inplace] [--output OUTPUT.csv] parent.csv a.csv b.csv\n");
-			io.writeStderr("  daff trim [--output OUTPUT.csv] source.csv\n");
-			io.writeStderr("  daff render [--output OUTPUT.html] diff.csv\n");
-			io.writeStderr("  daff copy in.csv out.tsv\n");
-			io.writeStderr("  daff git\n");
-			io.writeStderr("  daff version\n");
-			io.writeStderr("\n");
-			io.writeStderr("The --inplace option to patch and merge will result in modification of a.csv.\n");
-			io.writeStderr("\n");
-			io.writeStderr("If you need more control, here is the full list of flags:\n");
-			io.writeStderr("  daff diff [--output OUTPUT.csv] [--context NUM] [--all] [--act ACT] a.csv b.csv\n");
-			io.writeStderr("     --act ACT:     show only a certain kind of change (update, insert, delete)\n");
-			io.writeStderr("     --all:         do not prune unchanged rows or columns\n");
-			io.writeStderr("     --all-rows:    do not prune unchanged rows\n");
-			io.writeStderr("     --all-columns: do not prune unchanged columns\n");
-			io.writeStderr("     --color:       highlight changes with terminal colors (default in terminals)\n");
-			io.writeStderr("     --context NUM: show NUM rows of context\n");
-			io.writeStderr("     --id:          specify column to use as primary key (repeat for multi-column key)\n");
-			io.writeStderr("     --ignore:      specify column to ignore completely (can repeat)\n");
-			io.writeStderr("     --index:       include row/columns numbers from original tables\n");
-			io.writeStderr("     --input-format [csv|tsv|ssv|json]: set format to expect for input\n");
-			io.writeStderr("     --no-color:    make sure terminal colors are not used\n");
-			io.writeStderr("     --ordered:     assume row order is meaningful (default for CSV)\n");
-			io.writeStderr("     --output-format [csv|tsv|ssv|json|copy|html]: set format for output\n");
-			io.writeStderr("     --padding [dense|sparse|smart]: set padding method for aligning columns\n");
-			io.writeStderr("     --table NAME:  compare the named table, used with SQL sources\n");
-			io.writeStderr("     --unordered:   assume row order is meaningless (default for json formats)\n");
-			io.writeStderr("     -w / --ignore-whitespace: ignore changes in leading/trailing whitespace\n");
-			io.writeStderr("     -i / --ignore-case: ignore differences in case\n");
-			io.writeStderr("\n");
-			io.writeStderr("  daff render [--output OUTPUT.html] [--css CSS.css] [--fragment] [--plain] diff.csv\n");
-			io.writeStderr("     --css CSS.css: generate a suitable css file to go with the html\n");
-			io.writeStderr("     --fragment:    generate just a html fragment rather than a page\n");
-			io.writeStderr("     --plain:       do not use fancy utf8 characters to make arrows prettier\n");
-			io.writeStderr("     --www:         send output to a browser\n");
-			return 1;
-		}
-		var cmd1 = args[0];
-		var offset = 1;
-		if(!Lambda.has(["diff","patch","merge","trim","render","git","version","copy"],cmd1)) {
-			if(cmd1.indexOf(".") != -1 || cmd1.indexOf("--") == 0) {
-				cmd1 = "diff";
-				offset = 0;
-			}
-		}
-		if(cmd1 == "git") {
-			var types = args.splice(offset,args.length - offset);
-			return this.installGitDriver(io,types);
-		}
-		if(git) {
-			var ct = args.length - offset;
-			if(ct != 7 && ct != 9) {
-				io.writeStderr("Expected 7 or 9 parameters from git, but got " + ct + "\n");
-				return 1;
-			}
-			var git_args = args.splice(offset,ct);
-			args.splice(0,args.length);
-			offset = 0;
-			var old_display_path = git_args[0];
-			var new_display_path = git_args[0];
-			var old_file = git_args[1];
-			var new_file = git_args[4];
-			if(ct == 9) {
-				io.writeStdout(git_args[8]);
-				new_display_path = git_args[7];
-			}
-			io.writeStdout("--- a/" + old_display_path + "\n");
-			io.writeStdout("+++ b/" + new_display_path + "\n");
-			args.push(old_file);
-			args.push(new_file);
-		}
-		var tool = this;
-		tool.io = io;
-		var parent = null;
-		if(args.length - offset >= 3) {
-			parent = tool.loadTable(args[offset]);
-			offset++;
-		}
-		var aname = args[offset];
-		var a = tool.loadTable(aname);
-		var b = null;
-		if(args.length - offset >= 2) {
-			if(cmd1 != "copy") b = tool.loadTable(args[1 + offset]); else output = args[1 + offset];
-		}
-		this.flags.diff_strategy = this.strategy;
-		if(inplace) {
-			if(output != null) io.writeStderr("Please do not use --inplace when specifying an output.\n");
-			output = aname;
-			return 1;
-		}
-		if(output == null) output = "-";
-		var ok = true;
-		if(cmd1 == "diff") {
-			if(!this.order_set) {
-				this.flags.ordered = this.order_preference;
-				if(!this.flags.ordered) this.flags.unchanged_context = 0;
-			}
-			this.flags.allow_nested_cells = this.nested_output;
-			var ct1 = coopy.Coopy.compareTables3(parent,a,b,this.flags);
-			var align = ct1.align();
-			var td = new coopy.TableDiff(align,this.flags);
-			var o = new coopy.SimpleTable(0,0);
-			var os = new coopy.Tables(o);
-			td.hiliteWithNesting(os);
-			var use_color = color;
-			if(!(color || no_color)) {
-				if(output == "-" && this.output_format == "copy") {
-					if(io.isTtyKnown()) use_color = io.isTty();
-				}
-			}
-			tool.saveTables(output,os,use_color);
-		} else if(cmd1 == "patch") {
-			var patcher = new coopy.HighlightPatch(a,b);
-			patcher.apply();
-			tool.saveTable(output,a);
-		} else if(cmd1 == "merge") {
-			var merger = new coopy.Merger(parent,a,b,this.flags);
-			var conflicts = merger.apply();
-			ok = conflicts == 0;
-			if(conflicts > 0) io.writeStderr(conflicts + " conflict" + (conflicts > 1?"s":"") + "\n");
-			tool.saveTable(output,a);
-		} else if(cmd1 == "trim") tool.saveTable(output,a); else if(cmd1 == "render") this.renderTable(output,a); else if(cmd1 == "copy") tool.saveTable(output,a);
-		if(ok) return 0; else return 1;
+		this.saveTables(output,os,use_color);
 	}
 	,__class__: coopy.Coopy
 };
@@ -2898,6 +2270,11 @@ coopy.HighlightPatch.prototype = {
 	,getString: function(c) {
 		return this.view.toString(this.getDatum(c));
 	}
+	,getStringNull: function(c) {
+		var d = this.getDatum(c);
+		if(d == null) return null;
+		return this.view.toString(d);
+	}
 	,applyMeta: function() {
 		var _g1 = this.payloadCol;
 		var _g = this.payloadTop;
@@ -3007,7 +2384,7 @@ coopy.HighlightPatch.prototype = {
 			var cact = this.modifier.h[i];
 			if(cact == "...") continue;
 			if(name == null || name == "") continue;
-			var txt = this.getString(i);
+			var txt = this.csv.parseCell(this.getStringNull(i));
 			var updated = false;
 			if(this.rowInfo.updated) {
 				this.getPreString(txt);
@@ -3021,8 +2398,10 @@ coopy.HighlightPatch.prototype = {
 				}
 			}
 			if(updated) {
-				rc.cond.set(name,this.cellInfo.lvalue);
-				rc.val.set(name,this.cellInfo.rvalue);
+				var value = this.csv.parseCell(this.cellInfo.lvalue);
+				rc.cond.set(name,value);
+				var value1 = this.csv.parseCell(this.cellInfo.rvalue);
+				rc.val.set(name,value1);
 			} else if(code == "+++") {
 				if(cact != "---") rc.val.set(name,txt);
 			} else if(cact != "+++" && cact != "---") rc.cond.set(name,txt);
@@ -3640,336 +3019,6 @@ coopy.Meta.__name__ = true;
 coopy.Meta.prototype = {
 	__class__: coopy.Meta
 };
-coopy.JsonTable = function(data,name) {
-	this.data = data;
-	this.columns = Reflect.field(data,"columns");
-	this.rows = Reflect.field(data,"rows");
-	this.w = this.columns.length;
-	this.h = this.rows.length;
-	this.idx2col = new haxe.ds.IntMap();
-	var _g1 = 0;
-	var _g = this.columns.length;
-	while(_g1 < _g) {
-		var idx = _g1++;
-		var v = this.columns[idx];
-		this.idx2col.h[idx] = v;
-		v;
-	}
-	this.name = name;
-};
-coopy.JsonTable.__name__ = true;
-coopy.JsonTable.__interfaces__ = [coopy.Meta,coopy.Table];
-coopy.JsonTable.prototype = {
-	getTable: function() {
-		return this;
-	}
-	,get_width: function() {
-		return this.w;
-	}
-	,get_height: function() {
-		return this.h + 1;
-	}
-	,getCell: function(x,y) {
-		if(y == 0) return this.idx2col.h[x];
-		return Reflect.field(this.rows[y - 1],this.idx2col.h[x]);
-	}
-	,setCell: function(x,y,c) {
-		console.log("JsonTable is read-only");
-	}
-	,toString: function() {
-		return "";
-	}
-	,getCellView: function() {
-		return new coopy.SimpleView();
-	}
-	,isResizable: function() {
-		return false;
-	}
-	,resize: function(w,h) {
-		return false;
-	}
-	,clear: function() {
-	}
-	,insertOrDeleteRows: function(fate,hfate) {
-		return false;
-	}
-	,insertOrDeleteColumns: function(fate,wfate) {
-		return false;
-	}
-	,trimBlank: function() {
-		return false;
-	}
-	,getData: function() {
-		return null;
-	}
-	,clone: function() {
-		return null;
-	}
-	,setMeta: function(meta) {
-	}
-	,getMeta: function() {
-		return this;
-	}
-	,create: function() {
-		return null;
-	}
-	,alterColumns: function(columns) {
-		return false;
-	}
-	,changeRow: function(rc) {
-		return false;
-	}
-	,applyFlags: function(flags) {
-		return false;
-	}
-	,asTable: function() {
-		return null;
-	}
-	,cloneMeta: function(table) {
-		return null;
-	}
-	,useForColumnChanges: function() {
-		return false;
-	}
-	,useForRowChanges: function() {
-		return false;
-	}
-	,getRowStream: function() {
-		return null;
-	}
-	,isNested: function() {
-		return false;
-	}
-	,isSql: function() {
-		return false;
-	}
-	,getName: function() {
-		return this.name;
-	}
-	,__class__: coopy.JsonTable
-};
-coopy.JsonTables = function(json,flags) {
-	this.db = json;
-	var names = Reflect.field(json,"names");
-	var allowed = null;
-	var count = names.length;
-	if(flags != null && flags.tables != null) {
-		allowed = new haxe.ds.StringMap();
-		var _g = 0;
-		var _g1 = flags.tables;
-		while(_g < _g1.length) {
-			var name = _g1[_g];
-			++_g;
-			if(__map_reserved[name] != null) allowed.setReserved(name,true); else allowed.h[name] = true;
-		}
-		count = 0;
-		var _g2 = 0;
-		while(_g2 < names.length) {
-			var name1 = names[_g2];
-			++_g2;
-			if(__map_reserved[name1] != null?allowed.existsReserved(name1):allowed.h.hasOwnProperty(name1)) count++;
-		}
-	}
-	this.t = new coopy.SimpleTable(2,count + 1);
-	this.t.setCell(0,0,"name");
-	this.t.setCell(1,0,"table");
-	var v = this.t.getCellView();
-	var at = 1;
-	var _g3 = 0;
-	while(_g3 < names.length) {
-		var name2 = names[_g3];
-		++_g3;
-		if(allowed != null) {
-			if(!(__map_reserved[name2] != null?allowed.existsReserved(name2):allowed.h.hasOwnProperty(name2))) continue;
-		}
-		this.t.setCell(0,at,name2);
-		var tab = Reflect.field(this.db,"tables");
-		tab = Reflect.field(tab,name2);
-		this.t.setCell(1,at,v.wrapTable(new coopy.JsonTable(tab,name2)));
-		at++;
-	}
-};
-coopy.JsonTables.__name__ = true;
-coopy.JsonTables.__interfaces__ = [coopy.Table];
-coopy.JsonTables.prototype = {
-	getCell: function(x,y) {
-		return this.t.getCell(x,y);
-	}
-	,setCell: function(x,y,c) {
-	}
-	,getCellView: function() {
-		return this.t.getCellView();
-	}
-	,isResizable: function() {
-		return false;
-	}
-	,resize: function(w,h) {
-		return false;
-	}
-	,clear: function() {
-	}
-	,insertOrDeleteRows: function(fate,hfate) {
-		return false;
-	}
-	,insertOrDeleteColumns: function(fate,wfate) {
-		return false;
-	}
-	,trimBlank: function() {
-		return false;
-	}
-	,get_width: function() {
-		return this.t.get_width();
-	}
-	,get_height: function() {
-		return this.t.get_height();
-	}
-	,getData: function() {
-		return null;
-	}
-	,clone: function() {
-		return null;
-	}
-	,getMeta: function() {
-		return new coopy.SimpleMeta(this,true,true);
-	}
-	,create: function() {
-		return null;
-	}
-	,__class__: coopy.JsonTables
-};
-coopy.Merger = $hx_exports.coopy.Merger = function(parent,local,remote,flags) {
-	this.parent = parent;
-	this.local = local;
-	this.remote = remote;
-	this.flags = flags;
-};
-coopy.Merger.__name__ = true;
-coopy.Merger.makeConflictedCell = function(view,pcell,lcell,rcell) {
-	return view.toDatum("((( " + view.toString(pcell) + " ))) " + view.toString(lcell) + " /// " + view.toString(rcell));
-};
-coopy.Merger.prototype = {
-	shuffleDimension: function(dim_units,len,fate,cl,cr) {
-		var at = 0;
-		var _g = 0;
-		while(_g < dim_units.length) {
-			var cunit = dim_units[_g];
-			++_g;
-			if(cunit.p < 0) {
-				if(cunit.l < 0) {
-					if(cunit.r >= 0) {
-						{
-							cr.h[cunit.r] = at;
-							at;
-						}
-						at++;
-					}
-				} else {
-					{
-						cl.h[cunit.l] = at;
-						at;
-					}
-					at++;
-				}
-			} else if(cunit.l >= 0) {
-				if(cunit.r < 0) {
-				} else {
-					{
-						cl.h[cunit.l] = at;
-						at;
-					}
-					at++;
-				}
-			}
-		}
-		var _g1 = 0;
-		while(_g1 < len) {
-			var x = _g1++;
-			var idx = cl.h[x];
-			if(idx == null) fate.push(-1); else fate.push(idx);
-		}
-		return at;
-	}
-	,shuffleColumns: function() {
-		this.column_mix_local = new haxe.ds.IntMap();
-		this.column_mix_remote = new haxe.ds.IntMap();
-		var fate = [];
-		var wfate = this.shuffleDimension(this.column_units,this.local.get_width(),fate,this.column_mix_local,this.column_mix_remote);
-		this.local.insertOrDeleteColumns(fate,wfate);
-	}
-	,shuffleRows: function() {
-		this.row_mix_local = new haxe.ds.IntMap();
-		this.row_mix_remote = new haxe.ds.IntMap();
-		var fate = [];
-		var hfate = this.shuffleDimension(this.units,this.local.get_height(),fate,this.row_mix_local,this.row_mix_remote);
-		this.local.insertOrDeleteRows(fate,hfate);
-	}
-	,apply: function() {
-		this.conflicts = 0;
-		var ct = coopy.Coopy.compareTables3(this.parent,this.local,this.remote);
-		var align = ct.align();
-		this.order = align.toOrder();
-		this.units = this.order.getList();
-		this.column_order = align.meta.toOrder();
-		this.column_units = this.column_order.getList();
-		var allow_insert = this.flags.allowInsert();
-		var allow_delete = this.flags.allowDelete();
-		var allow_update = this.flags.allowUpdate();
-		var view = this.parent.getCellView();
-		var _g = 0;
-		var _g1 = this.units;
-		while(_g < _g1.length) {
-			var row = _g1[_g];
-			++_g;
-			if(row.l >= 0 && row.r >= 0 && row.p >= 0) {
-				var _g2 = 0;
-				var _g3 = this.column_units;
-				while(_g2 < _g3.length) {
-					var col = _g3[_g2];
-					++_g2;
-					if(col.l >= 0 && col.r >= 0 && col.p >= 0) {
-						var pcell = this.parent.getCell(col.p,row.p);
-						var rcell = this.remote.getCell(col.r,row.r);
-						if(!view.equals(pcell,rcell)) {
-							var lcell = this.local.getCell(col.l,row.l);
-							if(view.equals(pcell,lcell)) this.local.setCell(col.l,row.l,rcell); else {
-								this.local.setCell(col.l,row.l,coopy.Merger.makeConflictedCell(view,pcell,lcell,rcell));
-								this.conflicts++;
-							}
-						}
-					}
-				}
-			}
-		}
-		this.shuffleColumns();
-		this.shuffleRows();
-		var $it0 = this.column_mix_remote.keys();
-		while( $it0.hasNext() ) {
-			var x = $it0.next();
-			var x2 = this.column_mix_remote.h[x];
-			var _g4 = 0;
-			var _g11 = this.units;
-			while(_g4 < _g11.length) {
-				var unit = _g11[_g4];
-				++_g4;
-				if(unit.l >= 0 && unit.r >= 0) this.local.setCell(x2,this.row_mix_local.h[unit.l],this.remote.getCell(x,unit.r)); else if(unit.p < 0 && unit.r >= 0) this.local.setCell(x2,this.row_mix_remote.h[unit.r],this.remote.getCell(x,unit.r));
-			}
-		}
-		var $it1 = this.row_mix_remote.keys();
-		while( $it1.hasNext() ) {
-			var y = $it1.next();
-			var y2 = this.row_mix_remote.h[y];
-			var _g5 = 0;
-			var _g12 = this.column_units;
-			while(_g5 < _g12.length) {
-				var unit1 = _g12[_g5];
-				++_g5;
-				if(unit1.l >= 0 && unit1.r >= 0) this.local.setCell(this.column_mix_local.h[unit1.l],y2,this.remote.getCell(unit1.r,y));
-			}
-		}
-		return this.conflicts;
-	}
-	,__class__: coopy.Merger
-};
 coopy.Mover = $hx_exports.coopy.Mover = function() { };
 coopy.Mover.__name__ = true;
 coopy.Mover.moveUnits = function(units) {
@@ -4143,7 +3192,7 @@ coopy.Ndjson.prototype = {
 			var value = this.tab.getCell(c,r);
 			row.set(key,value);
 		}
-		return haxe.format.JsonPrinter.print(row,null,null);
+		return JSON.stringify(row);
 	}
 	,render: function() {
 		var txt = "";
@@ -4162,7 +3211,7 @@ coopy.Ndjson.prototype = {
 		return txt;
 	}
 	,addRow: function(r,txt) {
-		var json = new haxe.format.JsonParser(txt).parseRec();
+		var json = JSON.parse(txt);
 		if(this.columns == null) this.columns = new haxe.ds.StringMap();
 		var w = this.tab.get_width();
 		var h = this.tab.get_height();
@@ -5655,369 +4704,6 @@ coopy.SqlTableName.prototype = {
 	}
 	,__class__: coopy.SqlTableName
 };
-coopy.SqlTables = $hx_exports.coopy.SqlTables = function(db,flags) {
-	this.db = db;
-	var helper = this.db.getHelper();
-	var names = helper.getTableNames(db);
-	var allowed = null;
-	var count = names.length;
-	if(flags.tables != null) {
-		allowed = new haxe.ds.StringMap();
-		var _g = 0;
-		var _g1 = flags.tables;
-		while(_g < _g1.length) {
-			var name = _g1[_g];
-			++_g;
-			if(__map_reserved[name] != null) allowed.setReserved(name,true); else allowed.h[name] = true;
-		}
-		count = 0;
-		var _g2 = 0;
-		while(_g2 < names.length) {
-			var name1 = names[_g2];
-			++_g2;
-			if(__map_reserved[name1] != null?allowed.existsReserved(name1):allowed.h.hasOwnProperty(name1)) count++;
-		}
-	}
-	this.t = new coopy.SimpleTable(2,count + 1);
-	this.t.setCell(0,0,"name");
-	this.t.setCell(1,0,"table");
-	var v = this.t.getCellView();
-	var at = 1;
-	var _g3 = 0;
-	while(_g3 < names.length) {
-		var name2 = names[_g3];
-		++_g3;
-		if(allowed != null) {
-			if(!(__map_reserved[name2] != null?allowed.existsReserved(name2):allowed.h.hasOwnProperty(name2))) continue;
-		}
-		this.t.setCell(0,at,name2);
-		this.t.setCell(1,at,v.wrapTable(new coopy.SqlTable(db,new coopy.SqlTableName(name2))));
-		at++;
-	}
-};
-coopy.SqlTables.__name__ = true;
-coopy.SqlTables.__interfaces__ = [coopy.Table];
-coopy.SqlTables.prototype = {
-	getCell: function(x,y) {
-		return this.t.getCell(x,y);
-	}
-	,setCell: function(x,y,c) {
-	}
-	,getCellView: function() {
-		return this.t.getCellView();
-	}
-	,isResizable: function() {
-		return false;
-	}
-	,resize: function(w,h) {
-		return false;
-	}
-	,clear: function() {
-	}
-	,insertOrDeleteRows: function(fate,hfate) {
-		return false;
-	}
-	,insertOrDeleteColumns: function(fate,wfate) {
-		return false;
-	}
-	,trimBlank: function() {
-		return false;
-	}
-	,get_width: function() {
-		return this.t.get_width();
-	}
-	,get_height: function() {
-		return this.t.get_height();
-	}
-	,getData: function() {
-		return null;
-	}
-	,clone: function() {
-		return null;
-	}
-	,create: function() {
-		return null;
-	}
-	,getMeta: function() {
-		return new coopy.SimpleMeta(this,true,true);
-	}
-	,__class__: coopy.SqlTables
-};
-coopy.SqliteHelper = $hx_exports.coopy.SqliteHelper = function() {
-};
-coopy.SqliteHelper.__name__ = true;
-coopy.SqliteHelper.__interfaces__ = [coopy.SqlHelper];
-coopy.SqliteHelper.prototype = {
-	getTableNames: function(db) {
-		var q = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name";
-		if(!db.begin(q,null,["name"])) return null;
-		var names = [];
-		while(db.read()) names.push(db.get(0));
-		db.end();
-		return names;
-	}
-	,countRows: function(db,name) {
-		var q = "SELECT COUNT(*) AS ct FROM " + db.getQuotedTableName(name);
-		if(!db.begin(q,null,["ct"])) return -1;
-		var ct = -1;
-		while(db.read()) ct = db.get(0);
-		db.end();
-		return ct;
-	}
-	,getRowIDs: function(db,name) {
-		var result = [];
-		var q = "SELECT ROWID AS r FROM " + db.getQuotedTableName(name) + " ORDER BY ROWID";
-		if(!db.begin(q,null,["r"])) return null;
-		while(db.read()) {
-			var c = db.get(0);
-			result.push(c);
-		}
-		db.end();
-		return result;
-	}
-	,update: function(db,name,conds,vals) {
-		var q = "UPDATE " + db.getQuotedTableName(name) + " SET ";
-		var lst = [];
-		var $it0 = vals.keys();
-		while( $it0.hasNext() ) {
-			var k = $it0.next();
-			if(lst.length > 0) q += ", ";
-			q += db.getQuotedColumnName(k);
-			q += " = ?";
-			lst.push(__map_reserved[k] != null?vals.getReserved(k):vals.h[k]);
-		}
-		var val_len = lst.length;
-		q += " WHERE ";
-		var $it1 = conds.keys();
-		while( $it1.hasNext() ) {
-			var k1 = $it1.next();
-			if(lst.length > val_len) q += " and ";
-			q += db.getQuotedColumnName(k1);
-			q += " = ?";
-			lst.push(__map_reserved[k1] != null?conds.getReserved(k1):conds.h[k1]);
-		}
-		if(!db.begin(q,lst,[])) {
-			console.log("Problem with database update");
-			return false;
-		}
-		db.end();
-		return true;
-	}
-	,'delete': function(db,name,conds) {
-		var q = "DELETE FROM " + db.getQuotedTableName(name) + " WHERE ";
-		var lst = [];
-		var $it0 = conds.keys();
-		while( $it0.hasNext() ) {
-			var k = $it0.next();
-			if(lst.length > 0) q += " and ";
-			q += db.getQuotedColumnName(k);
-			q += " = ?";
-			lst.push(__map_reserved[k] != null?conds.getReserved(k):conds.h[k]);
-		}
-		if(!db.begin(q,lst,[])) {
-			console.log("Problem with database delete");
-			return false;
-		}
-		db.end();
-		return true;
-	}
-	,insert: function(db,name,vals) {
-		var q = "INSERT INTO " + db.getQuotedTableName(name) + " (";
-		var lst = [];
-		var $it0 = vals.keys();
-		while( $it0.hasNext() ) {
-			var k = $it0.next();
-			if(lst.length > 0) q += ",";
-			q += db.getQuotedColumnName(k);
-			lst.push(__map_reserved[k] != null?vals.getReserved(k):vals.h[k]);
-		}
-		q += ") VALUES(";
-		var need_comma = false;
-		var $it1 = vals.keys();
-		while( $it1.hasNext() ) {
-			var k1 = $it1.next();
-			if(need_comma) q += ",";
-			q += "?";
-			need_comma = true;
-		}
-		q += ")";
-		if(!db.begin(q,lst,[])) {
-			console.log("Problem with database insert");
-			return false;
-		}
-		db.end();
-		return true;
-	}
-	,attach: function(db,tag,resource_name) {
-		var tag_present = false;
-		var tag_correct = false;
-		var result = [];
-		var q = "PRAGMA database_list";
-		if(!db.begin(q,null,["seq","name","file"])) return false;
-		while(db.read()) {
-			var name = db.get(1);
-			if(name == tag) {
-				tag_present = true;
-				var file = db.get(2);
-				if(file == resource_name) tag_correct = true;
-			}
-		}
-		db.end();
-		if(tag_present) {
-			if(tag_correct) return true;
-			if(!db.begin("DETACH `" + tag + "`",null,[])) {
-				console.log("Failed to detach " + tag);
-				return false;
-			}
-			db.end();
-		}
-		if(!db.begin("ATTACH ? AS `" + tag + "`",[resource_name],[])) {
-			console.log("Failed to attach " + resource_name + " as " + tag);
-			return false;
-		}
-		db.end();
-		return true;
-	}
-	,columnListSql: function(x) {
-		return x.join(",");
-	}
-	,fetchSchema: function(db,name) {
-		var tname = db.getQuotedTableName(name);
-		var query = "select sql from sqlite_master where name = '" + tname + "'";
-		if(!db.begin(query,null,["sql"])) {
-			console.log("Cannot find schema for table " + tname);
-			return null;
-		}
-		var sql = "";
-		if(db.read()) sql = db.get(0);
-		db.end();
-		return sql;
-	}
-	,splitSchema: function(db,name,sql) {
-		var preamble = "";
-		var parts = [];
-		var double_quote = false;
-		var single_quote = false;
-		var token = "";
-		var nesting = 0;
-		var _g1 = 0;
-		var _g = sql.length;
-		while(_g1 < _g) {
-			var i = _g1++;
-			var ch = sql.charAt(i);
-			if(double_quote || single_quote) {
-				if(double_quote) {
-					if(ch == "\"") double_quote = false;
-				}
-				if(single_quote) {
-					if(ch == "'") single_quote = false;
-				}
-				token += ch;
-				continue;
-			}
-			var brk = false;
-			if(ch == "(") {
-				nesting++;
-				if(nesting == 1) brk = true;
-			} else if(ch == ")") {
-				nesting--;
-				if(nesting == 0) brk = true;
-			}
-			if(ch == ",") {
-				brk = true;
-				if(nesting == 1) {
-				}
-			}
-			if(brk) {
-				if(token.charAt(0) == " ") token = HxOverrides.substr(token,1,token.length);
-				if(preamble == "") preamble = token; else parts.push(token);
-				token = "";
-			} else token += ch;
-		}
-		var cols = db.getColumns(name);
-		var name2part = new haxe.ds.StringMap();
-		var name2col = new haxe.ds.StringMap();
-		var _g11 = 0;
-		var _g2 = cols.length;
-		while(_g11 < _g2) {
-			var i1 = _g11++;
-			var col = cols[i1];
-			name2part.set(col.name,parts[i1]);
-			name2col.set(col.name,cols[i1]);
-		}
-		return { preamble : preamble, parts : parts, name2part : name2part, columns : cols, name2column : name2col};
-	}
-	,exec: function(db,query) {
-		if(!db.begin(query)) {
-			console.log("database problem");
-			return false;
-		}
-		db.end();
-		return true;
-	}
-	,alterColumns: function(db,name,columns) {
-		var notBlank = function(x) {
-			if(x == null || x == "" || x == "null") return false;
-			return true;
-		};
-		var sql = this.fetchSchema(db,name);
-		var schema = this.splitSchema(db,name,sql);
-		var parts = schema.parts;
-		var nparts = [];
-		var new_column_list = [];
-		var ins_column_list = [];
-		var sel_column_list = [];
-		var meta = schema.columns;
-		var _g1 = 0;
-		var _g = columns.length;
-		while(_g1 < _g) {
-			var i = _g1++;
-			var c = columns[i];
-			if(c.name != null) {
-				if(c.prevName != null) {
-					sel_column_list.push(c.prevName);
-					ins_column_list.push(c.name);
-				}
-				var orig_type = "";
-				var orig_primary = false;
-				if(schema.name2column.exists(c.name)) {
-					var m = schema.name2column.get(c.name);
-					orig_type = m.type_value;
-					orig_primary = m.primary;
-				}
-				var next_type = orig_type;
-				var next_primary = orig_primary;
-				if(c.props != null) {
-					var _g2 = 0;
-					var _g3 = c.props;
-					while(_g2 < _g3.length) {
-						var p = _g3[_g2];
-						++_g2;
-						if(p.name == "type") next_type = p.val;
-						if(p.name == "key") next_primary = "" + Std.string(p.val) == "primary";
-					}
-				}
-				var part = "" + c.name;
-				if(notBlank(next_type)) part += " " + next_type;
-				if(next_primary) part += " PRIMARY KEY";
-				nparts.push(part);
-				new_column_list.push(c.name);
-			}
-		}
-		if(!this.exec(db,"BEGIN TRANSACTION")) return false;
-		var c1 = this.columnListSql(ins_column_list);
-		var tname = db.getQuotedTableName(name);
-		if(!this.exec(db,"CREATE TEMPORARY TABLE __coopy_backup(" + c1 + ")")) return false;
-		if(!this.exec(db,"INSERT INTO __coopy_backup (" + c1 + ") SELECT " + c1 + " FROM " + tname)) return false;
-		if(!this.exec(db,"DROP TABLE " + tname)) return false;
-		if(!this.exec(db,schema.preamble + "(" + nparts.join(", ") + ")")) return false;
-		if(!this.exec(db,"INSERT INTO " + tname + " (" + c1 + ") SELECT " + c1 + " FROM __coopy_backup")) return false;
-		if(!this.exec(db,"DROP TABLE __coopy_backup")) return false;
-		if(!this.exec(db,"COMMIT")) return false;
-		return true;
-	}
-	,__class__: coopy.SqliteHelper
-};
 coopy.TableComparisonState = $hx_exports.coopy.TableComparisonState = function() {
 	this.reset();
 };
@@ -6929,7 +5615,10 @@ coopy.TableIO = $hx_exports.coopy.TableIO = function() {
 };
 coopy.TableIO.__name__ = true;
 coopy.TableIO.prototype = {
-	getContent: function(name) {
+	valid: function() {
+		return false;
+	}
+	,getContent: function(name) {
 		return "";
 	}
 	,saveContent: function(name,txt) {
@@ -7415,11 +6104,6 @@ haxe.IMap.__name__ = true;
 haxe.IMap.prototype = {
 	__class__: haxe.IMap
 };
-haxe.Json = function() { };
-haxe.Json.__name__ = true;
-haxe.Json.stringify = function(value,replacer,space) {
-	return haxe.format.JsonPrinter.print(value,replacer,space);
-};
 haxe.ds = {};
 haxe.ds.IntMap = function() {
 	this.h = { };
@@ -7526,367 +6210,6 @@ haxe.ds.StringMap.prototype = {
 		return new haxe.ds._StringMap.StringMapIterator(this,this.arrayKeys());
 	}
 	,__class__: haxe.ds.StringMap
-};
-haxe.format = {};
-haxe.format.JsonParser = function(str) {
-	this.str = str;
-	this.pos = 0;
-};
-haxe.format.JsonParser.__name__ = true;
-haxe.format.JsonParser.prototype = {
-	parseRec: function() {
-		while(true) {
-			var c = StringTools.fastCodeAt(this.str,this.pos++);
-			switch(c) {
-			case 32:case 13:case 10:case 9:
-				break;
-			case 123:
-				var obj = { };
-				var field = null;
-				var comma = null;
-				while(true) {
-					var c1 = StringTools.fastCodeAt(this.str,this.pos++);
-					switch(c1) {
-					case 32:case 13:case 10:case 9:
-						break;
-					case 125:
-						if(field != null || comma == false) this.invalidChar();
-						return obj;
-					case 58:
-						if(field == null) this.invalidChar();
-						Reflect.setField(obj,field,this.parseRec());
-						field = null;
-						comma = true;
-						break;
-					case 44:
-						if(comma) comma = false; else this.invalidChar();
-						break;
-					case 34:
-						if(comma) this.invalidChar();
-						field = this.parseString();
-						break;
-					default:
-						this.invalidChar();
-					}
-				}
-				break;
-			case 91:
-				var arr = [];
-				var comma1 = null;
-				while(true) {
-					var c2 = StringTools.fastCodeAt(this.str,this.pos++);
-					switch(c2) {
-					case 32:case 13:case 10:case 9:
-						break;
-					case 93:
-						if(comma1 == false) this.invalidChar();
-						return arr;
-					case 44:
-						if(comma1) comma1 = false; else this.invalidChar();
-						break;
-					default:
-						if(comma1) this.invalidChar();
-						this.pos--;
-						arr.push(this.parseRec());
-						comma1 = true;
-					}
-				}
-				break;
-			case 116:
-				var save = this.pos;
-				if(StringTools.fastCodeAt(this.str,this.pos++) != 114 || StringTools.fastCodeAt(this.str,this.pos++) != 117 || StringTools.fastCodeAt(this.str,this.pos++) != 101) {
-					this.pos = save;
-					this.invalidChar();
-				}
-				return true;
-			case 102:
-				var save1 = this.pos;
-				if(StringTools.fastCodeAt(this.str,this.pos++) != 97 || StringTools.fastCodeAt(this.str,this.pos++) != 108 || StringTools.fastCodeAt(this.str,this.pos++) != 115 || StringTools.fastCodeAt(this.str,this.pos++) != 101) {
-					this.pos = save1;
-					this.invalidChar();
-				}
-				return false;
-			case 110:
-				var save2 = this.pos;
-				if(StringTools.fastCodeAt(this.str,this.pos++) != 117 || StringTools.fastCodeAt(this.str,this.pos++) != 108 || StringTools.fastCodeAt(this.str,this.pos++) != 108) {
-					this.pos = save2;
-					this.invalidChar();
-				}
-				return null;
-			case 34:
-				return this.parseString();
-			case 48:case 49:case 50:case 51:case 52:case 53:case 54:case 55:case 56:case 57:case 45:
-				return this.parseNumber(c);
-			default:
-				this.invalidChar();
-			}
-		}
-	}
-	,parseString: function() {
-		var start = this.pos;
-		var buf_b = "";
-		while(true) {
-			var c = StringTools.fastCodeAt(this.str,this.pos++);
-			if(c == 34) break;
-			if(c == 92) {
-				buf_b += HxOverrides.substr(this.str,start,this.pos - start - 1);
-				c = StringTools.fastCodeAt(this.str,this.pos++);
-				switch(c) {
-				case 114:
-					buf_b += "\r";
-					break;
-				case 110:
-					buf_b += "\n";
-					break;
-				case 116:
-					buf_b += "\t";
-					break;
-				case 98:
-					buf_b += "\x08";
-					break;
-				case 102:
-					buf_b += "\x0C";
-					break;
-				case 47:case 92:case 34:
-					buf_b += String.fromCharCode(c);
-					break;
-				case 117:
-					var uc = Std.parseInt("0x" + HxOverrides.substr(this.str,this.pos,4));
-					this.pos += 4;
-					buf_b += String.fromCharCode(uc);
-					break;
-				default:
-					throw "Invalid escape sequence \\" + String.fromCharCode(c) + " at position " + (this.pos - 1);
-				}
-				start = this.pos;
-			} else if(c != c) throw "Unclosed string";
-		}
-		buf_b += HxOverrides.substr(this.str,start,this.pos - start - 1);
-		return buf_b;
-	}
-	,parseNumber: function(c) {
-		var start = this.pos - 1;
-		var minus = c == 45;
-		var digit = !minus;
-		var zero = c == 48;
-		var point = false;
-		var e = false;
-		var pm = false;
-		var end = false;
-		while(true) {
-			c = StringTools.fastCodeAt(this.str,this.pos++);
-			switch(c) {
-			case 48:
-				if(zero && !point) this.invalidNumber(start);
-				if(minus) {
-					minus = false;
-					zero = true;
-				}
-				digit = true;
-				break;
-			case 49:case 50:case 51:case 52:case 53:case 54:case 55:case 56:case 57:
-				if(zero && !point) this.invalidNumber(start);
-				if(minus) minus = false;
-				digit = true;
-				zero = false;
-				break;
-			case 46:
-				if(minus || point) this.invalidNumber(start);
-				digit = false;
-				point = true;
-				break;
-			case 101:case 69:
-				if(minus || zero || e) this.invalidNumber(start);
-				digit = false;
-				e = true;
-				break;
-			case 43:case 45:
-				if(!e || pm) this.invalidNumber(start);
-				digit = false;
-				pm = true;
-				break;
-			default:
-				if(!digit) this.invalidNumber(start);
-				this.pos--;
-				end = true;
-			}
-			if(end) break;
-		}
-		var f = Std.parseFloat(HxOverrides.substr(this.str,start,this.pos - start));
-		var i = f | 0;
-		if(i == f) return i; else return f;
-	}
-	,invalidChar: function() {
-		this.pos--;
-		throw "Invalid char " + this.str.charCodeAt(this.pos) + " at position " + this.pos;
-	}
-	,invalidNumber: function(start) {
-		throw "Invalid number at position " + start + ": " + HxOverrides.substr(this.str,start,this.pos - start);
-	}
-	,__class__: haxe.format.JsonParser
-};
-haxe.format.JsonPrinter = function(replacer,space) {
-	this.replacer = replacer;
-	this.indent = space;
-	this.pretty = space != null;
-	this.nind = 0;
-	this.buf = new StringBuf();
-};
-haxe.format.JsonPrinter.__name__ = true;
-haxe.format.JsonPrinter.print = function(o,replacer,space) {
-	var printer = new haxe.format.JsonPrinter(replacer,space);
-	printer.write("",o);
-	return printer.buf.b;
-};
-haxe.format.JsonPrinter.prototype = {
-	ipad: function() {
-		if(this.pretty) {
-			var v = StringTools.lpad("",this.indent,this.nind * this.indent.length);
-			if(v == null) this.buf.b += "null"; else this.buf.b += "" + v;
-		}
-	}
-	,write: function(k,v) {
-		if(this.replacer != null) v = this.replacer(k,v);
-		{
-			var _g = Type["typeof"](v);
-			switch(_g[1]) {
-			case 8:
-				this.buf.b += "\"???\"";
-				break;
-			case 4:
-				this.fieldsString(v,Reflect.fields(v));
-				break;
-			case 1:
-				var v1 = v;
-				if(v1 == null) this.buf.b += "null"; else this.buf.b += "" + v1;
-				break;
-			case 2:
-				var v2;
-				if((function($this) {
-					var $r;
-					var f = v;
-					$r = isFinite(f);
-					return $r;
-				}(this))) v2 = v; else v2 = "null";
-				if(v2 == null) this.buf.b += "null"; else this.buf.b += "" + v2;
-				break;
-			case 5:
-				this.buf.b += "\"<fun>\"";
-				break;
-			case 6:
-				var c = _g[2];
-				if(c == String) this.quote(v); else if(c == Array) {
-					var v3 = v;
-					this.buf.b += "[";
-					var len = v3.length;
-					var last = len - 1;
-					var _g1 = 0;
-					while(_g1 < len) {
-						var i = _g1++;
-						if(i > 0) this.buf.b += ","; else this.nind++;
-						if(this.pretty) this.buf.b += "\n";
-						this.ipad();
-						this.write(i,v3[i]);
-						if(i == last) {
-							this.nind--;
-							if(this.pretty) this.buf.b += "\n";
-							this.ipad();
-						}
-					}
-					this.buf.b += "]";
-				} else if(c == haxe.ds.StringMap) {
-					var v4 = v;
-					var o = { };
-					var $it0 = v4.keys();
-					while( $it0.hasNext() ) {
-						var k1 = $it0.next();
-						Reflect.setField(o,k1,__map_reserved[k1] != null?v4.getReserved(k1):v4.h[k1]);
-					}
-					this.fieldsString(o,Reflect.fields(o));
-				} else if(c == Date) {
-					var v5 = v;
-					this.quote(HxOverrides.dateStr(v5));
-				} else this.fieldsString(v,Reflect.fields(v));
-				break;
-			case 7:
-				var i1 = Type.enumIndex(v);
-				var v6 = i1;
-				if(v6 == null) this.buf.b += "null"; else this.buf.b += "" + v6;
-				break;
-			case 3:
-				var v7 = v;
-				if(v7 == null) this.buf.b += "null"; else this.buf.b += "" + v7;
-				break;
-			case 0:
-				this.buf.b += "null";
-				break;
-			}
-		}
-	}
-	,fieldsString: function(v,fields) {
-		this.buf.b += "{";
-		var len = fields.length;
-		var last = len - 1;
-		var first = true;
-		var _g = 0;
-		while(_g < len) {
-			var i = _g++;
-			var f = fields[i];
-			var value = Reflect.field(v,f);
-			if(Reflect.isFunction(value)) continue;
-			if(first) {
-				this.nind++;
-				first = false;
-			} else this.buf.b += ",";
-			if(this.pretty) this.buf.b += "\n";
-			this.ipad();
-			this.quote(f);
-			this.buf.b += ":";
-			if(this.pretty) this.buf.b += " ";
-			this.write(f,value);
-			if(i == last) {
-				this.nind--;
-				if(this.pretty) this.buf.b += "\n";
-				this.ipad();
-			}
-		}
-		this.buf.b += "}";
-	}
-	,quote: function(s) {
-		this.buf.b += "\"";
-		var i = 0;
-		while(true) {
-			var c = StringTools.fastCodeAt(s,i++);
-			if(c != c) break;
-			switch(c) {
-			case 34:
-				this.buf.b += "\\\"";
-				break;
-			case 92:
-				this.buf.b += "\\\\";
-				break;
-			case 10:
-				this.buf.b += "\\n";
-				break;
-			case 13:
-				this.buf.b += "\\r";
-				break;
-			case 9:
-				this.buf.b += "\\t";
-				break;
-			case 8:
-				this.buf.b += "\\b";
-				break;
-			case 12:
-				this.buf.b += "\\f";
-				break;
-			default:
-				this.buf.b += String.fromCharCode(c);
-			}
-		}
-		this.buf.b += "\"";
-	}
-	,__class__: haxe.format.JsonPrinter
 };
 var js = {};
 js.Boot = function() { };
@@ -8028,8 +6351,6 @@ function $bind(o,m) { if( m == null ) return null; if( m.__id__ == null ) m.__id
 String.prototype.__class__ = String;
 String.__name__ = true;
 Array.__name__ = true;
-Date.prototype.__class__ = Date;
-Date.__name__ = ["Date"];
 var Int = { __name__ : ["Int"]};
 var Dynamic = { __name__ : ["Dynamic"]};
 var Float = Number;
@@ -8039,7 +6360,7 @@ Bool.__ename__ = ["Bool"];
 var Class = { __name__ : ["Class"]};
 var Enum = { };
 var __map_reserved = {}
-coopy.Coopy.VERSION = "1.3.8";
+coopy.Coopy.VERSION = "1.3.16";
 js.Boot.__toStr = {}.toString;
 coopy.Coopy.main();
 })(typeof console != "undefined" ? console : {log:function(){}}, typeof window != "undefined" ? window : exports);
@@ -8331,469 +6652,3 @@ if (typeof exports != "undefined") {
 }
 
 })();
-(function() {
-
-var coopy = null;
-if (typeof exports != "undefined") {
-    if (typeof exports.Coopy != "undefined") {
-	coopy = exports;
-    }
-}
-if (coopy == null) {
-    coopy = window.daff;
-}
-
-
-/**
- *
- * Wrapper around a table expressed as rows of hashes.  A mapping function can be passed if the
- * representation needs to be adapted a little.  The function will be passed data[i] and should
- * return a simple hash of { "col1": "val1", "col2": "val2", ... }
- *
- */
-var NdjsonTable = function(data,mapping) {
-    this.data = data;
-    this.height = data.length;
-    this.width = 0;
-    this.columns = [];
-    this.hasMapping = (mapping!=null);
-    if (mapping==null) {
-        mapping = function(x) { return x };
-    }
-    this.mapping = mapping;
-    var column_name_to_number = {};
-    if (this.height>0) {
-        // We scan all rows to find all fields in use.
-        for (var i=0; i<this.height; i++) {
-            var row = mapping(data[i]);
-            for (var key in row) {
-                if (key in column_name_to_number) continue;
-                if (!row.hasOwnProperty(key)) continue;
-                this.width++;
-                column_name_to_number[key] = this.columns.length;
-                this.columns.push(key);
-            }
-        }
-    }
-    this.columns.sort(); // make order deterministic
-    if (this.height>0) this.height++;
-}
-
-NdjsonTable.prototype.get_width = function() {
-    return this.width;
-}
-
-NdjsonTable.prototype.get_height = function() {
-    return this.height;
-}
-
-NdjsonTable.prototype.getCell = function(x,y) {
-    var key = this.columns[x];
-    if (key == null) throw Error("bad key");
-    if (y==0) return key;
-    return this.mapping(this.data[y-1])[key];
-}
-
-NdjsonTable.prototype.setCell = function(x,y,c) {
-    var key = this.columns[x];
-    if (key == null && y!=0) throw Error("bad key");
-    if (y==0) {
-        if (key!=null) throw Error("cannot yet change column set in this type of table");
-        this.columns[x] = c;
-    } else {
-        this.mapping(this.data[y-1])[key] = c;
-    }
-}
-
-NdjsonTable.prototype.toString = function() {
-    return coopy.SimpleTable.tableToString(this);
-}
-
-NdjsonTable.prototype.getCellView = function() {
-    return new coopy.CellView();
-}
-
-NdjsonTable.prototype.isResizable = function() {
-    // Ndjson wrapper can't usefully cope with schema changes.
-    return false;
-}
-
-NdjsonTable.prototype.resize = function(w,h) {
-    return false;
-}
-
-NdjsonTable.prototype.clear = function() {
-    return false;
-}
-
-NdjsonTable.prototype.getData = function() {
-    return this.data;
-}
-
-NdjsonTable.prototype.clone = function() {
-    var ndata = [];
-    for (var i=0; i<this.data.length; i++) {
-        var row = ndata[i] = {};
-        for (var c=0; c<this.columns; c++) {
-            var key = this.columns[c];
-	    row[key] = this.data[i][key];
-        }
-    }
-    return new NdjsonTable(ndata,this.hasMapping?this.mapping:null);
-}
-
-NdjsonTable.prototype.insertOrDeleteRows = function(fate, hfate) {
-    return false;
-}
-
-NdjsonTable.prototype.insertOrDeleteColumns = function(fate, wfate) {
-    return false;
-}
-
-NdjsonTable.prototype.getMeta = function() {
-    return null;
-}
-
-
-if (typeof exports != "undefined") {
-    exports.NdjsonTable = NdjsonTable;
-} else {
-    if (typeof window["daff"] == "undefined") window["daff"] = {};
-    window.daff.NdjsonTable = NdjsonTable;
-}
-
-})();
-if (typeof exports != "undefined") {
-    (function() {
-	var daff = exports;
-
-	SqliteDatabase = function(db,fname,Fiber) {
-	    this.db = db;
-            this.fname = fname;
-	    this.row = null;
-	    this.active = false;
-	    this.index2name = {};
-	    this.Fiber = Fiber;
-	}
-
-        SqliteDatabase.prototype.getHelper = function() {
-            return new daff.SqliteHelper();
-        }
-	
-	SqliteDatabase.prototype.getQuotedColumnName = function (name) {
-	    return name;
-	}
-	
-	SqliteDatabase.prototype.getQuotedTableName = function (name) {
-	    return name.toString();
-	}
-	
-	SqliteDatabase.prototype.getColumns = function(name) {
-	    var fiber = this.Fiber.current;
-	    var qname = this.getQuotedColumnName(name);
-	    var self = this;
-	    this.db.all("pragma table_info("+qname+")", function(err,rows) {
-		var lst = [];
-		for (var i in rows) {
-		    var x = rows[i];
-                    var col = new daff.SqlColumn();
-                    col.setName(x['name']);
-                    col.setPrimaryKey(x['pk']>0);
-                    if (x['type']) {
-                        col.setType(x['type'],'sqlite');
-                    }
-		    lst.push(col);
-		    self.index2name[i] = x['name'];
-		}
-		fiber.run(lst);
-	    });
-	    return this.Fiber.yield();
-	}
-	
-	SqliteDatabase.prototype.exec = function(query,args) {
-	    var fiber = this.Fiber.current;
-	    if (args==null) {
-		this.db.run(query,function(err) {
-		    if (err) console.log(err);
-		    fiber.run(err==null);
-		});
-		return this.Fiber.yield();
-	    }
-	    var statement = this.db.run(query,args,function(err) {
-		if (err) console.log(err);
-		fiber.run(err==null);
-	    });
-	    return this.Fiber.yield();
-	}
-	
-	SqliteDatabase.prototype.beginRow = function(tab,row,order) {
-	    return this.begin("SELECT * FROM " + this.getQuotedColumnName(tab) + " WHERE rowid = ?",
-			      [row],
-			      order);
-	}
-	
-	SqliteDatabase.prototype.begin = function(query,args,order) {
-	    if (order!=null) {
-		this.index2name = {};
-		var len = order.length;
-		for (var i=0; i<len; i++) {
-		    this.index2name[i] = order[i];
-		}
-	    }
-	    var fiber = this.Fiber.current;
-	    this.active = true;
-	    var self = this;
-	    this.db.each(query,(args==null)?[]:args,function(err,row) {
-		if (err) {
-		    fiber.run([false,0]);
-		} else {
-		    fiber.run([true,row]);
-		}
-	    },function(err,n) {
-                if (err) {
-                    console.log(err);
-                }
-		fiber.run([false,n]);
-	    });
-	    return true;
-	}
-
-	SqliteDatabase.prototype.read = function() {
-	    if (!this.active) return false;
-	    var v = this.Fiber.yield();
-	    if (v[0]) {
-		this.row = v[1];
-		return true;
-	    }
-	    this.row = null;
-	    this.active = false;
-	    return false;
-	}
-
-	SqliteDatabase.prototype.get = function(index) {
-	    return this.row[this.index2name[index]];
-	}
-
-	SqliteDatabase.prototype.end = function() {
-	    while (this.active) {
-		this.read();
-	    }
-	}
-
-	SqliteDatabase.prototype.rowid = function() {
-	    return "rowid";
-	}
-
-	SqliteDatabase.prototype.getNameForAttachment = function() {
-	    return this.fname;
-	}
-
-	exports.SqliteDatabase = SqliteDatabase;
-
-    })();
-}
-if (typeof exports != "undefined") {
-    
-    var tio = {};
-    var tio_args = [];
-
-    var coopy = exports;
-    var fs = require('fs');
-    var exec = require('child_process').exec;
-    var readline = null;
-    var Fiber = null;
-    var sqlite3 = null;
-    var tty = null;
-    
-    tio.getContent = function(name) {
-        var txt = "";
-	if (name=="-") {
-	    // only works on Linux, all other solutions seem broken
-	    txt = fs.readFileSync('/dev/stdin',"utf8");
-	} else {
-	    txt = fs.readFileSync(name,"utf8");
-        }
-        if (txt.charCodeAt(0) === 0xFEFF) {
-	    return txt.slice(1);
-	}
-        return txt;
-    }
-    
-    tio.saveContent = function(name,txt) {
-	return fs.writeFileSync(name,txt,"utf8");
-    }
-    
-    tio.args = function() {
-	return tio_args;
-    }
-    
-    tio.writeStdout = function(txt) {
-	process.stdout.write(txt);
-    }
-    
-    tio.writeStderr = function(txt) {
-	process.stderr.write(txt);
-    }
-    
-    tio.async = function() {
-	return true;
-    }
-
-    tio.exists = function(path) {
-	return fs.existsSync(path);
-    }
-
-    tio.isTtyKnown = function() {
-        return true;
-    }
-
-    tio.isTty = function() {
-        if (typeof process.stdout.isTTY !== 'undefined') {
-            if (process.stdout.isTTY) return true;
-        } else {
-            // fall back on tty api
-            if (tty==null) tty = require('tty');
-            if (tty.isatty(process.stdout.fd)) return true;
-        }
-        // There's a wrinkle when called from git.  Git may have started a pager that
-        // respects color but which will not be detected as a terminal.  In this case,
-        // it appears that git defines GIT_PAGER_IN_USE, so we watch out for that.
-        if (process.env.GIT_PAGER_IN_USE == 'true') return true;
-        return false;
-    }
-
-    tio.openSqliteDatabase = function(path) {
-	if (Fiber) {
-	    return new coopy.SqliteDatabase(new sqlite3.Database(path),path,Fiber);
-	}
-	throw("run inside Fiber plz");
-	return null;
-    }
-
-    tio.sendToBrowser = function(html) {
-        var http = require("http");
-	var shutdown = null;
-        var server = http.createServer(function(request, response) {
-            response.writeHead(200, 
-                               {
-                                   "Content-Type": "text/html; charset=UTF-8",
-                                   "Connection": "close"
-                               });
-            response.write(html);
-            response.end();
-	    shutdown();
-        });
-	var sockets = {}, nextSocketId = 0;
-	server.on('connection', function (socket) {
-	    var socketId = nextSocketId++;
-	    sockets[socketId] = socket;
-	    socket.on('close', function () {
-		delete sockets[socketId];
-	    });
-	});
-	shutdown = function() {
-	    server.close();
-	    for (var socketId in sockets) {
-		sockets[socketId].destroy();
-	    }
-	};
-        server.listen(0,null,null,function() {
-            var target = "http://localhost:" + server.address().port;
-            var exec = require('child_process').exec;
-            var cmd = "xdg-open";
-            switch (process.platform) {
-            case 'darwin':
-		cmd = 'open';
-		break;
-            case 'win32':
-		cmd = 'start ""';
-		break;
-            }
-            exec(cmd + ' "' + target + '"', function(error) { 
-		if (error) {
-                    console.error(error);
-                    server.close();
-		}
-            });
-	});
-    }
-
-    var cmd_result = 1;
-    var cmd_pending = null;
-
-    tio.command = function(cmd,args) {
-	// we promise not to use any arguments with quotes in them
-	for (var i=0; i<args.length; i++) {
-	    var argi = args[i];
-	    if (argi.indexOf(" ")>=0) {
-		argi = "\"" + argi + "\"";
-	    }
-	    cmd += " " + argi;
-	}
-	var cmd = cmd; + " " + args.join(" ");
-	if (cmd == cmd_pending) {
-	    cmd_pending = null;
-	    return cmd_result;
-	} else if (cmd_pending!=null) {
-	    return 998; // "hack not working correctly"
-	}
-	cmd_pending = cmd;
-	return 999; // "cannot be executed synchronously"
-    }
-
-    function run_daff_base(main,args) {
-	tio_args = args.slice();
-	var code = main.coopyhx(tio);
-	if (code==999) {
-	    if (cmd_pending!=null) {
-		exec(cmd_pending,function(error,stdout,stderr) {
-		    cmd_result = 0;
-		    if (error!=null) {
-			cmd_result = error.code;
-		    }
-		    return run_daff_base(main,args);
-		});
-	    }
-	} 
-	return code;
-    }
-    
-    exports.run_daff_main = function() {
-	var main = new exports.Coopy();
-	var code = run_daff_base(main,process.argv.slice(2));
-	if (code!=999) {
-            if (code!=0) {
-	        process.exit(code);
-            }
-	}
-    }
-
-    exports.cmd = function(args) {
-	var main = new exports.Coopy();
-	var code = run_daff_base(main,args);
-	return code;
-    }
-}
-
-if (typeof require != "undefined") {
-    if (require.main === module) {
-	try {
-	    exports.run_daff_main();
-	} catch (e) {
-	    if (e == "run inside Fiber plz") {
-		try {
-		    Fiber = require('fibers');
-		    sqlite3 = require('sqlite3');
-		} catch (err) {
-		    // We don't have what we need for accessing the sqlite database.
-		    console.log("No sqlite3/fibers");
-		}
-		Fiber(function() {
-		    exports.run_daff_main();
-		}).run();
-            } else {
-                throw(e);
-            }
-	}
-    }
-}
