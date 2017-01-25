@@ -1,6 +1,6 @@
 {
   "name": "daff",
-  "version": "1.3.8",
+  "version": "1.3.25",
   "homepage": "https://github.com/paulfitz/daff-web",
   "authors": [
     "Paul Fitzpatrick <paul.michael.fitzpatrick@gmail.com>"
@@ -18,11 +18,15 @@
   "license": "MIT",
   "ignore": [
     "**/.*",
-    "node_modules",
+    "*~",
+    "cache",
     "bower_components",
+    "index.html",
+    "Makefile",
+    "node_modules",
+    "scripts",
     "test",
     "tests",
-    "scripts",
-    "index.html"
+    "tmp"
   ]
 }
